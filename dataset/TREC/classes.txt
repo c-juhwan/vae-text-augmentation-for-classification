@@ -1,0 +1,6 @@
+DESC - Description
+ENTY - Entity
+ABBR - Abbreviation
+HUM - Human being
+LOC - Location
+NUM - Numeric value
