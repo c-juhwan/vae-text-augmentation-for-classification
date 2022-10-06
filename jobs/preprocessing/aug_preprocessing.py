@@ -62,20 +62,23 @@ def preprocessing(args:argparse.Namespace) -> None:
             'Text' : [],
             'Label' : [],
             'Num_Label' : num_classes,
+            'Vocab' : vocabulary,
             'Vocab_Size' : vocab_size
         },
         'valid' : {
             'Text' : [],
             'Label' : [],
             'Num_Label' : num_classes,
+            'Vocab' : vocabulary,
             'Vocab_Size' : vocab_size
         },
         'test' : {
             'Text' : [],
             'Label' : [],
             'Num_Label' : num_classes,
+            'Vocab' : vocabulary,
             'Vocab_Size' : vocab_size
-        }
+        },
     }
 
     for split_df, split in zip([train_df, valid_df, test_df], ['train', 'valid', 'test']):

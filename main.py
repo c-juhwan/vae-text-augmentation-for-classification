@@ -91,17 +91,20 @@ if __name__ == '__main__':
     # Model - Common Arguments
     parser.add_argument('--model_name', type=str, default='VAE_TextAug',
                         help='Name of the model.')
-    model_type_list = ['RNN', 'GRU', 'LSTM', 'CNN', 'Transformer', 'BERT']
-    parser.add_argument('--model_type', type=str, choices=model_type_list, default='Transformer',
-                        help='Type of the model.')
     parser.add_argument('--embed_size', type=int, default=512,
                         help='Dimension of the embedding.')
     parser.add_argument('--hidden_size', type=int, default=512,
                         help='Dimension of the hidden layer.')
+    parser.add_argument('--latent_size', type=int, default=256,
+                        help='Dimension of the latent layer.')
     parser.add_argument('--num_layers', type=int, default=2,
                         help='Number of layers for LSTM; Default is 2')
     parser.add_argument('--dropout_rate', type=float, default=0.2,
                         help='Dropout Rate; Default is 0.2')
+    parser.add_argument('--bidirectional', type=bool, default=True,
+                        help='Whether to use bidirectional RNNs; Default is True')
+    parser.add_argument('--activation_func', type=str, default='gelu',
+                        help='Activation function for the model.')
 
     # Optimizer & Scheduler
     optim_list = ['SGD', 'Adam', 'AdamW']
