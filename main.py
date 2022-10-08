@@ -129,6 +129,9 @@ if __name__ == '__main__':
                         help='Gradient clipping norm; Default is 5')
     parser.add_argument('--early_stopping_patience', default=15, type=int,
                         help='Early stopping patience; No early stopping if None; Default is 15')
+    objective_list = ['loss', 'accuracy']
+    parser.add_argument('--optimize_objective', default='loss', type=str, choices=objective_list,
+                        help='Objective to optimize; Default is loss')
 
     # Testing/Inference - Config
     parser.add_argument('--test_batch_size', default=1, type=int,
