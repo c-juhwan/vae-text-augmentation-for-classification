@@ -82,7 +82,7 @@ def preprocessing(args:argparse.Namespace) -> None:
     }
 
     for split_df, split in zip([train_df, valid_df, test_df], ['train', 'valid', 'test']):
-        for idx in tqdm(range(len(split_df)), desc='Preprocessing'):
+        for idx in tqdm(range(len(split_df)), desc=f'Preprocessing for {split}'):
             text = split_df['text'][idx]
             label = split_df['class'][idx]
 

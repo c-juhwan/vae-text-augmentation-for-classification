@@ -95,7 +95,7 @@ if __name__ == '__main__':
                         help='Dimension of the embedding.')
     parser.add_argument('--hidden_size', type=int, default=512,
                         help='Dimension of the hidden layer.')
-    parser.add_argument('--latent_size', type=int, default=256,
+    parser.add_argument('--latent_size', type=int, default=128,
                         help='Dimension of the latent layer.')
     parser.add_argument('--num_layers', type=int, default=2,
                         help='Number of layers for LSTM; Default is 2')
@@ -127,8 +127,8 @@ if __name__ == '__main__':
                         help='Weight decay; Default is 5e-4; If 0, no weight decay')
     parser.add_argument('--clip_grad_norm', default=5, type=int,
                         help='Gradient clipping norm; Default is 5')
-    parser.add_argument('--early_stopping_patience', default=15, type=int,
-                        help='Early stopping patience; No early stopping if None; Default is 15')
+    parser.add_argument('--early_stopping_patience', default=5, type=int,
+                        help='Early stopping patience; No early stopping if None; Default is 5')
     objective_list = ['loss', 'accuracy']
     parser.add_argument('--optimize_objective', default='loss', type=str, choices=objective_list,
                         help='Objective to optimize; Default is loss')

@@ -47,6 +47,7 @@ def training(args:argparse.Namespace) -> None:
                                           shuffle=True, pin_memory=True, drop_last=True)
     dataloader_dict['valid'] = DataLoader(dataset_dict['valid'], batch_size=args.batch_size, num_workers=args.num_workers,
                                           shuffle=False, pin_memory=True, drop_last=False)
+    args.vocab_size = dataset_dict['train'].vocab_size
     write_log(logger, "Loaded data successfully")
     write_log(logger, f"Train dataset size / iterations: {len(dataset_dict['train'])} / {len(dataloader_dict['train'])}")
 
@@ -62,7 +63,7 @@ def training(args:argparse.Namespace) -> None:
     scaler = GradScaler()
 
     # Get Loss function
-    recon_loss = nn.NLLLoss()
+    ReconLoss = nn.NLLLoss()
 
     # If resume training, load from checkpoint
     start_epoch = 0
@@ -102,7 +103,7 @@ def training(args:argparse.Namespace) -> None:
             # Train - Forward pass
             with autocast():
                 output_prob, mu, logvar = model(input_seq)
-                recon_loss = recon_loss(output_prob, target_prob) # NLLLoss
+                recon_loss = ReconLoss(output_prob, target_prob) # NLLLoss
                 kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
                 total_loss = recon_loss + 0.1*kl_loss
 
