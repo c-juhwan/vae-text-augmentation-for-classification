@@ -5,6 +5,7 @@ import pickle
 import argparse
 from collections import Counter, OrderedDict
 # 3rd-party Modules
+import bs4
 import pandas as pd
 from tqdm.auto import tqdm
 from nltk.tokenize import WordPunctTokenizer, sent_tokenize
@@ -12,6 +13,8 @@ from nltk.tokenize import WordPunctTokenizer, sent_tokenize
 import torch
 from torchtext.vocab import vocab
 from torchtext.data.utils import get_tokenizer
+# Huggingface Modules
+from transformers import BertTokenizer, BertConfig
 # Custom Modules
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from utils import check_path
@@ -44,11 +47,22 @@ def preprocessing(args:argparse.Namespace) -> None:
 
     # Build vocabulary
     sent_tokenizer = get_tokenizer(sent_tokenize)
-    tokenizer = get_tokenizer(WordPunctTokenizer().tokenize)
+    word_tokenizer = get_tokenizer(WordPunctTokenizer().tokenize)
     counter = Counter()
     for idx in tqdm(range(len(train_df)), desc='Building Vocab'):
-        text = train_df['text'][idx]
-        counter.update(tokenizer(text))
+        text = train_df['text'][idx].lower()
+
+        clean_text = bs4.BeautifulSoup(text, 'lxml').text
+        clean_text = clean_text.replace(',', ' ')
+        clean_text = clean_text.replace('(', ' ')
+        clean_text = clean_text.replace(')', ' ')
+        clean_text = clean_text.replace('-', ' ')
+        clean_text = clean_text.replace(':', ' ')
+        clean_text = clean_text.replace(';', ' ')
+        # remove multiple spaces
+        clean_text = ' '.join(clean_text.split())
+
+        counter.update(word_tokenizer(clean_text))
     sorted_by_freq_tuples = sorted(counter.items(), key=lambda x: x[1], reverse=True)
     ordered_dict = OrderedDict(sorted_by_freq_tuples)
     vocabulary = vocab(ordered_dict, specials=['<pad>', '<unk>', '<bos>', '<eos>'], min_freq=args.vocab_min_freq)
@@ -83,13 +97,25 @@ def preprocessing(args:argparse.Namespace) -> None:
 
     for split_df, split in zip([train_df, valid_df, test_df], ['train', 'valid', 'test']):
         for idx in tqdm(range(len(split_df)), desc=f'Preprocessing for {split}'):
-            text = split_df['text'][idx]
+            text = split_df['text'][idx].lower()
             label = split_df['class'][idx]
+
+            clean_text = bs4.BeautifulSoup(text, 'lxml').text
+            clean_text = clean_text.replace(',', ' ')
+            clean_text = clean_text.replace('(', ' ')
+            clean_text = clean_text.replace(')', ' ')
+            clean_text = clean_text.replace('-', ' ')
+            clean_text = clean_text.replace(':', ' ')
+            clean_text = clean_text.replace(';', ' ')
+            # remove multiple spaces
+            clean_text = ' '.join(clean_text.split())
 
             # Tokenize
             tokenized_text = []
-            for each_sent in sent_tokenizer(text):
-                tokenized_sent = tokenizer(each_sent)
+            for each_sent in sent_tokenizer(clean_text):
+                tokenized_sent = word_tokenizer(each_sent)
+                # Remove special tokens
+                tokenized_sent = [token for token in tokenized_sent if token not in ['.', '?', '!']]
                 tokenized_text.extend(tokenized_sent)
             # Convert to index
             indexed_text = [vocabulary[token] for token in tokenized_text]
@@ -98,7 +124,8 @@ def preprocessing(args:argparse.Namespace) -> None:
             if len(indexed_text) < args.max_seq_len: # Add padding
                 indexed_text += [vocabulary['<pad>']] * (args.max_seq_len - len(indexed_text))
             else: # Truncate
-                indexed_text = indexed_text[:args.max_seq_len]
+                indexed_text = indexed_text[:args.max_seq_len-1]
+                indexed_text += [vocabulary['<eos>']]
             # Convert to tensor
             indexed_text = torch.tensor(indexed_text, dtype=torch.long)
 

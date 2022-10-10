@@ -20,9 +20,9 @@ def get_scheduler(optimizer, dataloader_length, args) -> torch.optim.lr_schedule
         return CosineAnnealingWarmRestarts(optimizer, T_0=dataloader_length*T_0,
                                            T_mult=dataloader_length*T_mult, eta_min=eta_min)
     elif args.scheduler == 'ReduceLROnPlateau':
-        patience = args.num_epochs // 8
+        patience = args.early_stopping_patience // 2 if args.early_stopping_patience > 0 else args.num_epochs // 10
         return ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=patience)
-    elif args.scheduler == 'None':
+    elif args.scheduler == 'None' or args.scheduler is None:
         return None
     else:
         raise ValueError(f'Unknown scheduler option {args.scheduler}')

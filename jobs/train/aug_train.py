@@ -16,12 +16,11 @@ from torch.utils.tensorboard import SummaryWriter
 # Custom Modules
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from model.augmentation.aug_model import AugmentationModel as Model
-from model.augmentation.aug_model import GaussianKLLoss
+from model.augmentation.aug_model import kl_annealing
 from model.augmentation.dataset import AugmentationDataset as Dataset
 from model.optimizer.optimizer import get_optimizer
 from model.optimizer.scheduler import get_scheduler
 from utils import TqdmLoggingHandler, write_log, get_tb_exp_name, get_torch_device, check_path
-#from metrics import get_binary_accuracy, get_binary_precision, get_binary_recall, get_binary_macro_f1
 
 def training(args:argparse.Namespace) -> None:
     device = get_torch_device(args.device)
@@ -48,6 +47,7 @@ def training(args:argparse.Namespace) -> None:
     dataloader_dict['valid'] = DataLoader(dataset_dict['valid'], batch_size=args.batch_size, num_workers=args.num_workers,
                                           shuffle=False, pin_memory=True, drop_last=False)
     args.vocab_size = dataset_dict['train'].vocab_size
+    vocabulary = dataset_dict['train'].vocabulary
     write_log(logger, "Loaded data successfully")
     write_log(logger, f"Train dataset size / iterations: {len(dataset_dict['train'])} / {len(dataloader_dict['train'])}")
 
@@ -63,7 +63,7 @@ def training(args:argparse.Namespace) -> None:
     scaler = GradScaler()
 
     # Get Loss function
-    ReconLoss = nn.NLLLoss()
+    ReconLoss = nn.NLLLoss(ignore_index=args.pad_id)
 
     # If resume training, load from checkpoint
     start_epoch = 0
@@ -76,7 +76,10 @@ def training(args:argparse.Namespace) -> None:
         start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['model'])
         optimizer.load_state_dict(checkpoint['optimizer'])
-        scheduler.load_state_dict(checkpoint['scheduler'])
+        if scheduler is not None:
+            scheduler.load_state_dict(checkpoint['scheduler'])
+        else:
+            scheduler = None
         scaler.load_state_dict(checkpoint['scaler'])
         model = model.to(device)
         write_log(logger, f"Loaded training model from epoch {start_epoch}")
@@ -91,21 +94,33 @@ def training(args:argparse.Namespace) -> None:
         model = model.train()
         train_recon_loss = 0
         train_kl_loss = 0
+        train_acc = 0
+        kl_lambda = 0 if args.variational is False else kl_annealing(epoch_idx, args.num_epochs) if args.kl_lambda < 0 else args.kl_lambda
 
         for iter_idx, data_dicts in enumerate(tqdm(dataloader_dict['train'], total=len(dataloader_dict['train']), desc=f'Training - Epoch [{epoch_idx}/{args.num_epochs}]')):
             # Train - Get batched data from dataloader
             input_seq = data_dicts['Text_Tensor'].to(device)
-            target_prob = input_seq[:, 1:].contiguous() # Remove <bos> token
-            target_prob = target_prob.view(-1) # Flatten target_prob for NLLLoss
-
-            ####### PADDING 길이 제거하여서 처리할 수 Loss 처리할 수 있도록 수정해야함
+            target = input_seq[:, 1:].contiguous() # Remove <bos> token
+            target = target.view(-1) # Flatten target for NLLLoss
 
             # Train - Forward pass
             with autocast():
                 output_prob, mu, logvar = model(input_seq)
-                recon_loss = ReconLoss(output_prob, target_prob) # NLLLoss
-                kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-                total_loss = recon_loss + 0.1*kl_loss
+
+                # Remove padding to calculate accuracy
+                output_prob = output_prob.view(-1, args.vocab_size)
+                target = target.view(-1)
+                non_pad_mask = target.ne(args.pad_id)
+                output_prob = output_prob[non_pad_mask]
+                target = target[non_pad_mask]
+                accuracy = (output_prob.argmax(dim=-1) == target).float().mean()
+
+                recon_loss = ReconLoss(output_prob, target) # NLLLoss
+                if args.variational:
+                    kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+                else:
+                    kl_loss = torch.Tensor([0]).to(device)
+                total_loss = recon_loss + kl_lambda*kl_loss
 
             # Train - Backward pass
             optimizer.zero_grad()
@@ -121,8 +136,10 @@ def training(args:argparse.Namespace) -> None:
             # Train - Logging
             train_recon_loss += recon_loss.item()
             train_kl_loss += kl_loss.item()
+            train_acc += accuracy.item()
             if iter_idx % args.log_freq == 0 or iter_idx == len(dataloader_dict['train']) - 1:
                 write_log(logger, f"TRAIN - Epoch [{epoch_idx}/{args.num_epochs}] - Iter [{iter_idx}/{len(dataloader_dict['train'])}] - Loss: {total_loss.item():.4f}")
+                write_log(logger, f"TRAIN - Epoch [{epoch_idx}/{args.num_epochs}] - Iter [{iter_idx}/{len(dataloader_dict['train'])}] - Acc: {accuracy.item():.4f}")
 
             # Train - Log to tensorboard
             if args.use_tensorboard:
@@ -132,47 +149,67 @@ def training(args:argparse.Namespace) -> None:
         if args.use_tensorboard:
             writer.add_scalar('TRAIN/Loss/Reconstruction', train_recon_loss / len(dataloader_dict['train']), epoch_idx)
             writer.add_scalar('TRAIN/Loss/KL', train_kl_loss / len(dataloader_dict['train']), epoch_idx)
-            writer.add_scalar('TRAIN/Loss/Total', (train_recon_loss + 0.1*train_kl_loss) / len(dataloader_dict['train']), epoch_idx)
-            ## ACCURACY 추가
+            writer.add_scalar('TRAIN/Loss/Total', (train_recon_loss + kl_lambda*train_kl_loss) / len(dataloader_dict['train']), epoch_idx)
+            writer.add_scalar('TRAIN/Accuracy', train_acc / len(dataloader_dict['train']), epoch_idx)
+            writer.add_scalar('TRAIN/KL_Lambda', kl_lambda, epoch_idx)
 
         # Validate model
-        model = model.eval
+        model = model.eval()
         valid_recon_loss = 0
         valid_kl_loss = 0
+        valid_acc = 0
 
         for iter_idx, data_dicts in enumerate(tqdm(dataloader_dict['valid'], total=len(dataloader_dict['valid']), desc=f'Validating - Epoch [{epoch_idx}/{args.num_epochs}]')):
             # Validate - Get batched data from dataloader
             input_seq = data_dicts['Text_Tensor'].to(device)
-            target_prob = input_seq[:, 1:].contiguous()
-            target_prob = target_prob.view(-1)
+            target = input_seq[:, 1:].contiguous()
+            target = target.view(-1)
 
             # Validate - Forward pass
             with torch.no_grad():
                 output_prob, mu, logvar = model(input_seq)
-                recon_loss = recon_loss(output_prob, target_prob)
-                kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-                total_loss = recon_loss + 0.1*kl_loss
+
+                # Remove padding to calculate accuracy
+                output_prob = output_prob.view(-1, args.vocab_size)
+                target = target.view(-1)
+                non_pad_mask = target.ne(args.pad_id)
+                output_prob = output_prob[non_pad_mask]
+                target = target[non_pad_mask]
+                accuracy = (output_prob.argmax(dim=-1) == target).float().mean()
+
+                recon_loss = ReconLoss(output_prob, target) # NLLLoss
+                if args.variational:
+                    kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+                else:
+                    kl_loss = torch.Tensor([0]).to(device)
+                total_loss = recon_loss + kl_lambda*kl_loss
 
             # Validate - Logging
             valid_recon_loss += recon_loss.item()
             valid_kl_loss += kl_loss.item()
+            valid_acc += accuracy.item()
             if iter_idx % args.log_freq == 0 or iter_idx == len(dataloader_dict['valid']) - 1:
                 write_log(logger, f"VALID - Epoch [{epoch_idx}/{args.num_epochs}] - Iter [{iter_idx}/{len(dataloader_dict['valid'])}] - Loss: {total_loss.item():.4f}")
+                write_log(logger, f"VALID - Epoch [{epoch_idx}/{args.num_epochs}] - Iter [{iter_idx}/{len(dataloader_dict['valid'])}] - Acc: {accuracy.item():.4f}")
+
+        print(vocabulary.lookup_tokens(output_prob.argmax(dim=-1).tolist()))
+        print(vocabulary.lookup_tokens(target.tolist()))
 
         # Validation - Scheduler
         if args.scheduler == 'LambdaLR':
             scheduler.step()
         elif args.scheduler == 'ReduceLROnPlateau':
-            scheduler.step(valid_recon_loss + 0.1*valid_kl_loss)
+            scheduler.step(valid_recon_loss + kl_lambda*valid_kl_loss)
 
         # Validation - Check loss & Save Checkpoint
-        valid_classification_loss /= len(dataloader_dict['valid'])
-        valid_attention_loss /= len(dataloader_dict['valid'])
+        valid_recon_loss /= len(dataloader_dict['valid'])
+        valid_kl_loss /= len(dataloader_dict['valid'])
+        valid_acc /= len(dataloader_dict['valid'])
         if args.optimize_objective == 'loss':
-            valid_objective_value = valid_classification_loss + args.pri_attention_lambda*valid_attention_loss
+            valid_objective_value = valid_recon_loss + kl_lambda*valid_kl_loss
             valid_objective_value = -1 * valid_objective_value # Loss is minimized, but we want to maximize the objective value
         elif args.optimize_objective == 'accuracy':
-            raise NotImplementedError
+            valid_objective_value = valid_acc
         if best_valid_objective_value is None or valid_objective_value > best_valid_objective_value:
             best_valid_objective_value = valid_objective_value
             best_epoch_idx = epoch_idx
@@ -186,27 +223,27 @@ def training(args:argparse.Namespace) -> None:
                         'epoch': epoch_idx,
                         'model': model.state_dict(),
                         'optimizer': optimizer.state_dict(),
-                        'scheduler': scheduler.state_dict(),
+                        'scheduler': scheduler.state_dict() if scheduler is not None else None,
                         'scaler': scaler.state_dict(),
             }, save_checkpoint_name)
-            write_log(logger, f'VALID - Best valid at epoch {best_epoch_idx} - {args.optimize_objective}: {best_valid_objective_value:.4f}')
+            write_log(logger, f'VALID - Best valid at epoch {best_epoch_idx} - {args.optimize_objective}: {abs(best_valid_objective_value):.4f}')
             write_log(logger, f'VALID - Saved checkpoint to {save_checkpoint_name}')
         else:
             early_stopping_counter += 1
-            write_log(logger, f'VALID - Worse than epoch {best_epoch_idx} - Current {args.optimize_objective}: {valid_objective_value:.4f} - Best {args.optimize_objective}: {best_valid_objective_value:.4f}')
+            write_log(logger, f'VALID - Worse than epoch {best_epoch_idx} - Current {args.optimize_objective}: {abs(valid_objective_value):.4f} - Best {args.optimize_objective}: {abs(best_valid_objective_value):.4f}')
 
         # Validation - Log to tensorboard
         if args.use_tensorboard:
-            writer.add_scalar('VALID/Loss/Reconstruction', valid_recon_loss / len(dataloader_dict['valid']), epoch_idx)
-            writer.add_scalar('VALID/Loss/KL', valid_kl_loss / len(dataloader_dict['valid']), epoch_idx)
-            writer.add_scalar('VALID/Loss/Total', (valid_recon_loss + 0.1*valid_kl_loss) / len(dataloader_dict['valid']), epoch_idx)
-            # Accuracy 추가
+            writer.add_scalar('VALID/Loss/Reconstruction', valid_recon_loss, epoch_idx)
+            writer.add_scalar('VALID/Loss/KL', valid_kl_loss, epoch_idx)
+            writer.add_scalar('VALID/Loss/Total', (valid_recon_loss + kl_lambda*valid_kl_loss), epoch_idx)
+            writer.add_scalar('VALID/Accuracy', valid_acc, epoch_idx)
 
         # Validation - Early Stopping
             if early_stopping_counter >= args.early_stopping_patience:
                 write_log(logger, f'VALID - Early stopping at epoch {epoch_idx}')
                 break
-    write_log(logger, f'Done! Best epoch: {best_epoch_idx} - Best {args.optimize_objective}: {best_valid_objective_value:.4f}')
+    write_log(logger, f'Done! Best epoch: {best_epoch_idx} - Best {args.optimize_objective}: {abs(best_valid_objective_value):.4f}')
 
     # Save best model as final model
     check_path(os.path.join(args.model_path, args.task))

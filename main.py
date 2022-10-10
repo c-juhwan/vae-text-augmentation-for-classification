@@ -85,38 +85,40 @@ if __name__ == '__main__':
                         help='Path to the result after testing.')
 
     # Preprocessing
-    parser.add_argument('--max_seq_len', type=int, default=300,
+    parser.add_argument('--max_seq_len', type=int, default=30,
                         help='Maximum sequence length for each task.')
 
     # Model - Common Arguments
     parser.add_argument('--model_name', type=str, default='VAE_TextAug',
                         help='Name of the model.')
-    parser.add_argument('--embed_size', type=int, default=512,
+    parser.add_argument('--embed_size', type=int, default=768,
                         help='Dimension of the embedding.')
-    parser.add_argument('--hidden_size', type=int, default=512,
+    parser.add_argument('--hidden_size', type=int, default=768,
                         help='Dimension of the hidden layer.')
-    parser.add_argument('--latent_size', type=int, default=128,
+    parser.add_argument('--latent_size', type=int, default=32,
                         help='Dimension of the latent layer.')
     parser.add_argument('--num_layers', type=int, default=2,
-                        help='Number of layers for LSTM; Default is 2')
+                        help='Number of layers for GRU; Default is 2')
     parser.add_argument('--dropout_rate', type=float, default=0.2,
                         help='Dropout Rate; Default is 0.2')
-    parser.add_argument('--bidirectional', type=bool, default=True,
-                        help='Whether to use bidirectional RNNs; Default is True')
+    parser.add_argument('--variational', type=bool, default=True,
+                        help='Whether to use variational autoencoder; Default is True')
     parser.add_argument('--activation_func', type=str, default='gelu',
                         help='Activation function for the model.')
+    parser.add_argument('--kl_lambda', type=float, default=-1,
+                        help='Weight for KL divergence loss; Default is 0.1; if less than 0, use KL annealing')
 
     # Optimizer & Scheduler
     optim_list = ['SGD', 'Adam', 'AdamW']
-    scheduler_list = ['StepLR', 'LambdaLR', 'CosineAnnealingLR', 'CosineAnnealingWarmRestarts', 'ReduceLROnPlateau']
+    scheduler_list = ['None', 'StepLR', 'LambdaLR', 'CosineAnnealingLR', 'CosineAnnealingWarmRestarts', 'ReduceLROnPlateau']
     parser.add_argument('--optimizer', default='Adam', choices=optim_list, type=str,
                         help="Optimizer to use; Default is Adam")
-    parser.add_argument('--scheduler', default='LambdaLR', choices=scheduler_list, type=str,
+    parser.add_argument('--scheduler', default='ReduceLROnPlateau', choices=scheduler_list, type=str,
                         help="Scheduler to use; Default is LambdaLR")
 
     # Training - Config
-    parser.add_argument('--num_epochs', default=100, type=int,
-                        help='Training epochs; Default is 100')
+    parser.add_argument('--num_epochs', default=300, type=int,
+                        help='Training epochs; Default is 300')
     parser.add_argument('--num_workers', default=2, type=int,
                         help='Num CPU Workers; Default is 2')
     parser.add_argument('--batch_size', default=16, type=int,
@@ -127,11 +129,11 @@ if __name__ == '__main__':
                         help='Weight decay; Default is 5e-4; If 0, no weight decay')
     parser.add_argument('--clip_grad_norm', default=5, type=int,
                         help='Gradient clipping norm; Default is 5')
-    parser.add_argument('--early_stopping_patience', default=5, type=int,
-                        help='Early stopping patience; No early stopping if None; Default is 5')
+    parser.add_argument('--early_stopping_patience', default=20, type=int,
+                        help='Early stopping patience; No early stopping if None; Default is 20')
     objective_list = ['loss', 'accuracy']
-    parser.add_argument('--optimize_objective', default='loss', type=str, choices=objective_list,
-                        help='Objective to optimize; Default is loss')
+    parser.add_argument('--optimize_objective', default='accuracy', type=str, choices=objective_list,
+                        help='Objective to optimize; Default is accuracy')
 
     # Testing/Inference - Config
     parser.add_argument('--test_batch_size', default=1, type=int,
@@ -140,8 +142,8 @@ if __name__ == '__main__':
     # Vocabulary
     parser.add_argument('--vocab_size', default=-1, type=int,
                         help='Vocabulary size; To be specified for each dataset')
-    parser.add_argument('--vocab_min_freq', default=10, type=int,
-                        help='Minimum frequency of words in vocabulary; Default is 10')
+    parser.add_argument('--vocab_min_freq', default=3, type=int,
+                        help='Minimum frequency of words in vocabulary; Default is 3')
     parser.add_argument('--pad_id', default=0, type=int,
                         help='Pad id; Default is 0')
     parser.add_argument('--unk_id', default=1, type=int,
@@ -160,7 +162,7 @@ if __name__ == '__main__':
                         help='Using tensorboard; Default is True')
     parser.add_argument('--tensorboard_path', default='./tensorboard_runs', type=str,
                         help='Tensorboard log path; Default is ./tensorboard_runs/')
-    parser.add_argument('--log_freq', default=100, type=int,
+    parser.add_argument('--log_freq', default=500, type=int,
                         help='Logging frequency; Default is 500')
 
     args = parser.parse_args()

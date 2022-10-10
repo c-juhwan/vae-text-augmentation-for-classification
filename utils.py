@@ -98,6 +98,7 @@ def get_tb_exp_name(args:argparse.Namespace):
 
     if args.job in ['training', 'resume_training']:
         exp_name += 'TRAIN - '
+        exp_name += "DATA=%s - " % args.task_dataset.upper()
         exp_name += "BS=%i_" % args.batch_size
         exp_name += "EP=%i_" % args.num_epochs
         exp_name += "LR=%.6f_" % args.learning_rate
