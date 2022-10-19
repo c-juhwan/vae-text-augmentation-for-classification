@@ -91,6 +91,9 @@ if __name__ == '__main__':
     # Model - Common Arguments
     parser.add_argument('--model_name', type=str, default='VAE_TextAug',
                         help='Name of the model.')
+    model_list = ['rnn', 'lstm', 'gru', 'transformer', 'bert', 'cnn']
+    parser.add_argument('--model_type', type=str, choices=model_list, default='lstm',
+                        help='Type of the model.')
     parser.add_argument('--embed_size', type=int, default=768,
                         help='Dimension of the embedding.')
     parser.add_argument('--hidden_size', type=int, default=768,
@@ -102,9 +105,11 @@ if __name__ == '__main__':
     parser.add_argument('--dropout_rate', type=float, default=0.2,
                         help='Dropout Rate; Default is 0.2')
     parser.add_argument('--variational', type=bool, default=True,
-                        help='Whether to use variational autoencoder; Default is True')
+                        help='Whether to use variational autoencoder; Default is Tru')
     parser.add_argument('--activation_func', type=str, default='gelu',
                         help='Activation function for the model.')
+    parser.add_argument('--denosing_rate', type=float, default=0.1,
+                        help='Denosing rate for the denosing autoencoder.')
     parser.add_argument('--kl_lambda', type=float, default=-1,
                         help='Weight for KL divergence loss; Default is 0.1; if less than 0, use KL annealing')
 
@@ -129,8 +134,8 @@ if __name__ == '__main__':
                         help='Weight decay; Default is 5e-4; If 0, no weight decay')
     parser.add_argument('--clip_grad_norm', default=5, type=int,
                         help='Gradient clipping norm; Default is 5')
-    parser.add_argument('--early_stopping_patience', default=20, type=int,
-                        help='Early stopping patience; No early stopping if None; Default is 20')
+    parser.add_argument('--early_stopping_patience', default=10, type=int,
+                        help='Early stopping patience; No early stopping if None; Default is 10')
     objective_list = ['loss', 'accuracy']
     parser.add_argument('--optimize_objective', default='accuracy', type=str, choices=objective_list,
                         help='Objective to optimize; Default is accuracy')

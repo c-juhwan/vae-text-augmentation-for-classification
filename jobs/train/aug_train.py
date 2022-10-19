@@ -244,6 +244,8 @@ def training(args:argparse.Namespace) -> None:
                 write_log(logger, f'VALID - Early stopping at epoch {epoch_idx}')
                 break
     write_log(logger, f'Done! Best epoch: {best_epoch_idx} - Best {args.optimize_objective}: {abs(best_valid_objective_value):.4f}')
+    if args.use_tensorboard:
+        writer.add_text('VALID/Best', f'Best epoch: {best_epoch_idx} - Best {args.optimize_objective}: {abs(best_valid_objective_value):.4f}')
 
     # Save best model as final model
     check_path(os.path.join(args.model_path, args.task))
