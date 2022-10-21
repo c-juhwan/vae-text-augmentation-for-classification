@@ -14,6 +14,7 @@ class AugmentationDataset(Dataset):
         self.data_list = []
         self.vocabulary = data_['Vocab']
         self.vocab_size = data_['Vocab_Size']
+        self.num_classes = data_['Num_Label']
         for idx in tqdm(range(len(data_['Text'])), desc=f'Loading data from {data_path}'):
             self.data_list.append({
                 'Text_Tensor': data_['Text'][idx],

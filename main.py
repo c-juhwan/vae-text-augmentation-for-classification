@@ -91,8 +91,8 @@ if __name__ == '__main__':
     # Model - Common Arguments
     parser.add_argument('--model_name', type=str, default='VAE_TextAug',
                         help='Name of the model.')
-    model_list = ['rnn', 'lstm', 'gru', 'transformer', 'bert', 'cnn']
-    parser.add_argument('--model_type', type=str, choices=model_list, default='lstm',
+    model_list = ['rnn', 'gru', 'lstm', 'transformer', 'cnn']
+    parser.add_argument('--model_type', type=str, choices=model_list, default='transformer',
                         help='Type of the model.')
     parser.add_argument('--embed_size', type=int, default=768,
                         help='Dimension of the embedding.')
@@ -104,9 +104,10 @@ if __name__ == '__main__':
                         help='Number of layers for GRU; Default is 2')
     parser.add_argument('--dropout_rate', type=float, default=0.2,
                         help='Dropout Rate; Default is 0.2')
-    parser.add_argument('--variational', type=bool, default=True,
-                        help='Whether to use variational autoencoder; Default is Tru')
-    parser.add_argument('--activation_func', type=str, default='gelu',
+    variational_list = ['AE', 'VAE', 'CVAE']
+    parser.add_argument('--variational_type', type=str, choices=variational_list, default='vae',
+                        help='Whether to use variational autoencoder; Default is VAE')
+    parser.add_argument('--activation_func', type=str, default='relu',
                         help='Activation function for the model.')
     parser.add_argument('--denosing_rate', type=float, default=0.1,
                         help='Denosing rate for the denosing autoencoder.')
@@ -132,7 +133,7 @@ if __name__ == '__main__':
                         help='Maximum learning rate of warmup scheduler; Default is 3e-4')
     parser.add_argument('--weight_decay', default=5e-4, type=float,
                         help='Weight decay; Default is 5e-4; If 0, no weight decay')
-    parser.add_argument('--clip_grad_norm', default=5, type=int,
+    parser.add_argument('--clip_grad_norm', default=0, type=int,
                         help='Gradient clipping norm; Default is 5')
     parser.add_argument('--early_stopping_patience', default=10, type=int,
                         help='Early stopping patience; No early stopping if None; Default is 10')
@@ -144,7 +145,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_batch_size', default=1, type=int,
                         help='Batch size for test; Default is 1')
 
-    # Vocabulary
+    # Vocabulary & Label
     parser.add_argument('--vocab_size', default=-1, type=int,
                         help='Vocabulary size; To be specified for each dataset')
     parser.add_argument('--vocab_min_freq', default=3, type=int,
@@ -157,6 +158,8 @@ if __name__ == '__main__':
                         help='Beginning of sentence id; Default is 2')
     parser.add_argument('--eos_id', default=3, type=int,
                         help='End of sentence id; Default is 3')
+    parser.add_argument('--num_classes', default=-1, type=int,
+                        help='Number of classes; To be specified for each dataset')
 
     # Device & Seed & Logging
     parser.add_argument('--device', default='cuda', type=str,

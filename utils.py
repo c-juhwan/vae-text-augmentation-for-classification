@@ -104,9 +104,11 @@ def get_tb_exp_name(args:argparse.Namespace):
         exp_name += "LR=%.6f_" % args.learning_rate
     elif args.job == 'testing':
         exp_name += 'TEST - '
+        exp_name += "DATA=%s - " % args.task_dataset.upper()
         exp_name += "BS=%i_" % args.test_batch_size
     elif args.job == 'inference':
         exp_name += 'INF - '
+        exp_name += "DATA=%s - " % args.task_dataset.upper()
         exp_name += "BS=%i_" % args.test_batch_size
     exp_name += "TS=%s" % ts
 
