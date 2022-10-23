@@ -13,8 +13,7 @@ from nltk.tokenize import WordPunctTokenizer, sent_tokenize
 import torch
 from torchtext.vocab import vocab
 from torchtext.data.utils import get_tokenizer
-# Huggingface Modules
-from transformers import BertTokenizer, BertConfig
+
 # Custom Modules
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from utils import check_path

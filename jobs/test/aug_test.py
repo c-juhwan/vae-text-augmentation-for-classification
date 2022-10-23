@@ -76,7 +76,6 @@ def testing(args:argparse.Namespace):
         # Test - Forward pass
         with torch.no_grad():
             output_prob, output_seq, mu, logvar = model.inference(input_seq, input_label)
-            #output_prob, mu, logvar = model(input_seq, input_label)
 
             # Remove padding to calculate accuracy
             output_prob = output_prob.view(-1, args.vocab_size)

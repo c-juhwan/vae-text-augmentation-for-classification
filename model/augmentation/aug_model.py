@@ -340,7 +340,6 @@ class AugmentationModel(nn.Module):
                 generated_sequence = torch.cat([generated_sequence, next_word], dim=-1) # (test_batch_size, seq_len+1)
                 output_prob = torch.cat([output_prob, next_word_pred.unsqueeze(1)], dim=1) # (test_batch_size, seq_len+1, vocab_size)
 
-            generated_sequence = generated_sequence[:, 1:] # (test_batch_size, max_seq_len-1) # <bos> is not included
             output_prob = output_prob[:, 1:] # (test_batch_size, max_seq_len-1, vocab_size) # <bos> is not included
             output_prob = output_prob.view(-1, output_prob.size(-1)) # (test_batch_size * (max_seq_len-1), vocab_size)
 
