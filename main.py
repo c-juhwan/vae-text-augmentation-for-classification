@@ -140,7 +140,7 @@ if __name__ == '__main__':
     objective_list = ['loss', 'accuracy']
     parser.add_argument('--optimize_objective', default='accuracy', type=str, choices=objective_list,
                         help='Objective to optimize; Default is accuracy')
-    parser.add_argument('--training_dataset_aug', choices=['none', 'model', 'eda'], default='none',
+    parser.add_argument('--training_dataset_aug', choices=['none', 'model', 'model_only', 'eda', 'eda_only'], default='none',
                         help='Whether to use data augmentation for training dataset; Default is none')
 
     # Testing/Inference - Config

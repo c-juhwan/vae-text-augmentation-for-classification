@@ -39,12 +39,15 @@ def training(args:argparse.Namespace):
     # Load dataset and define dataloader
     write_log(logger, "Loading data")
     dataset_dict, dataloader_dict = {}, {}
-    if args.training_dataset_aug is 'model':
-        #dataset_dict['train'] = Dataset(os.path.join(args.preprocessed_path, args.task, args.task_dataset, f'train_{args.max_seq_len}+model_aug.pkl'))
+    if args.training_dataset_aug == 'model':
         dataset_dict['train'] = Dataset(os.path.join(args.result_path, 'augmentation', args.task_dataset, f'train_{args.max_seq_len}+model_aug.pkl'))
-    elif args.training_dataset_aug is 'eda':
+    elif args.training_dataset_aug == 'model_only':
+        dataset_dict['train'] = Dataset(os.path.join(args.result_path, 'augmentation', args.task_dataset, f'train_{args.max_seq_len}+model_aug_only.pkl'))
+    elif args.training_dataset_aug == 'eda':
         raise NotImplementedError
-    else:
+    elif args.training_dataset_aug == 'eda_only':
+        raise NotImplementedError
+    else: # none - no augmentation
         dataset_dict['train'] = Dataset(os.path.join(args.preprocessed_path, args.task, args.task_dataset, f'train_{args.max_seq_len}.pkl'))
     dataset_dict['valid'] = Dataset(os.path.join(args.preprocessed_path, args.task, args.task_dataset, f'valid_{args.max_seq_len}.pkl'))
     dataloader_dict['train'] = DataLoader(dataset_dict['train'], batch_size=args.batch_size, num_workers=args.num_workers,
@@ -106,8 +109,6 @@ def training(args:argparse.Namespace):
             # Train - Get batched data from dataloader
             input_seq = data_dicts['Text_Tensor'].to(device)
             target = data_dicts['Label_Tensor'].to(device)
-            print(input_seq.size())
-            print(target, target.size())
 
             # Train - Forward pass
             with autocast():

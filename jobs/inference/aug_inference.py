@@ -61,6 +61,13 @@ def inference(args:argparse.Namespace):
         'Vocab': vocabulary,
         'Vocab_Size': args.vocab_size
     }
+    aug_data_dict = {
+        'Text': [],
+        'Label': [],
+        'Num_Label': args.num_classes,
+        'Vocab': vocabulary,
+        'Vocab_Size': args.vocab_size
+    }
     write_log(logger, "Start inference")
     for iter_idx, data_dicts in enumerate(tqdm(dataloader_train, total=len(dataloader_train), desc=f'Inference for Training data')):
         # Inference - Get batched data from dataloader
@@ -90,13 +97,18 @@ def inference(args:argparse.Namespace):
         # Add augmented data to total_data_dict
         total_data_dict['Text'].append(output_seq.to('cpu'))
         total_data_dict['Label'].append(input_label.view(-1).squeeze().to('cpu'))
+        aug_data_dict['Text'].append(output_seq.to('cpu'))
+        aug_data_dict['Label'].append(input_label.view(-1).squeeze().to('cpu'))
         # Add original data to total_data_dict
         total_data_dict['Text'].append(input_seq.view(-1).to('cpu'))
         total_data_dict['Label'].append(input_label.squeeze().to('cpu'))
 
-    # Save total_data to pickle file
+    # Save data to pickle file
     check_path(os.path.join(args.result_path, args.task, args.task_dataset))
     with open(os.path.join(args.result_path, args.task, args.task_dataset, f'train_{args.max_seq_len}+model_aug.pkl'), 'wb') as f:
         pickle.dump(total_data_dict, f)
+    with open(os.path.join(args.result_path, args.task, args.task_dataset, f'train_{args.max_seq_len}+model_aug_only.pkl'), 'wb') as f:
+        pickle.dump(aug_data_dict, f)
+
 
     write_log(logger, "Finished inference")
